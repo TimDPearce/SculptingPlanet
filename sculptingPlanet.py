@@ -1,5 +1,5 @@
 
-'''Program to constrain the parameters of a single planet which is 
+'''Python program to constrain the parameters of a single planet which is
 sculpting a debris disc, by Tim D. Pearce. The model is from
 Pearce et al. 2022, which builds on that of Pearce & Wyatt 2014. It 
 assumes that a planet resides interior to the disc inner edge, and that 
@@ -26,8 +26,9 @@ import numpy as np
 import math
 from scipy import integrate
 import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-############################# User Inputs #############################
+############################## User Inputs ##############################
 ''' Parameters of the system, and their associated uncertainties and 
 units. For example, if the star mass is 1.2 MSun with 1sigma 
 uncertainties of +0.1 MSun and -0.2 MSun, then set mStar_mSun=2, 
@@ -542,7 +543,7 @@ def PrintUserInputs():
 
 #------------------------------------------------------------------------
 def PrintProgramOutputs(minMassPlanetPars, uncertaintiesOnMinMassPlanetPars):
-	'''Print the user inputs'''
+	'''Print the calculation results'''
 	
 	# Unpack the parameters of the minimum-mass plt and its 
 	# uncertainties
@@ -667,7 +668,11 @@ def GetValueAndUncertaintyString(value, err1SigUp, err1SigDown):
 			else:
 				valueAndUncertaintyString = '%s +%s -%s' % (valueRoundedString, err1SigUpRounded, err1SigDownRounded)
 					
-	# Otherwise value is zero or nan, or at least one error is Nan
+	# Otherwise, if both uncertainties are nan, then only quote the value
+	elif math.isnan(err1SigUp) and math.isnan(err1SigDown):
+		valueAndUncertaintyString = value
+
+	# Otherwise either the value is zero or nan, or only one error is nan
 	else:
 		valueAndUncertaintyString = '%s +%s -%s' % (value, err1SigUp, err1SigDown)
 
@@ -821,13 +826,22 @@ def MakePlot(minMassPlanetPars, uncertaintiesOnMinMassPlanetPars):
 	plt.xlabel(r'Planet semimajor axis / au')
 	plt.ylabel(r'Planet mass / ${\rm M_{Jup}}$')
 	
-	# Axis limits	
-	yAxisMin = 0.01*(mPltMinForTrunc_mJup - mPltMinForTrunc1SigDown_mJup)
+	# Axis limits
+	if math.isnan(mPltMinForTrunc1SigDown_mJup) == False: mPltMinus1SigDown_mJup = mPltMinForTrunc_mJup - mPltMinForTrunc1SigDown_mJup
+	else: mPltMinus1SigDown_mJup = mPltMinForTrunc_mJup
+		
+	yAxisMin = 0.01*mPltMinus1SigDown_mJup
 	if yAxisMin<=0: yAxisMin = 0.01*mPltMinForTrunc_mJup
 
-	yAxisMax = 100*(mPltMinForTrunc_mJup + mPltMinForTrunc1SigUp_mJup)
+	if math.isnan(mPltMinForTrunc1SigUp_mJup) == False: mPltPlus1SigUp_mJup = mPltMinForTrunc_mJup + mPltMinForTrunc1SigUp_mJup
+	else: mPltPlus1SigUp_mJup = mPltMinForTrunc_mJup
+	
+	yAxisMax = 100*mPltPlus1SigUp_mJup
+	
+	if math.isnan(discInnerEdgeApo1SigUp_au) == False: discInnerEdgeApoPlus1SigUp_au = discInnerEdgeApo_au+discInnerEdgeApo1SigUp_au
+	else: discInnerEdgeApoPlus1SigUp_au = discInnerEdgeApo_au	
 
-	plt.xlim(0, 1.1*(discInnerEdgeApo_au+discInnerEdgeApo1SigUp_au))
+	plt.xlim(0, 1.1*discInnerEdgeApoPlus1SigUp_au)
 	plt.ylim(yAxisMin, yAxisMax)	
 
 	# Log scale (must be after axis limits)
