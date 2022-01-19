@@ -26,7 +26,6 @@ import numpy as np
 import math
 from scipy import integrate
 import matplotlib
-matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 ############################## User Inputs ##############################
 ''' Parameters of the system, and their associated uncertainties and 
