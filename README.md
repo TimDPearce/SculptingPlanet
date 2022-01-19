@@ -13,10 +13,14 @@ axis and, if the disc is eccentric, the minimum possible eccentricity of
 the perturbing planet. It can also produce a plot showing the allowed 
 region of parameter space that the planet can reside in.
 
-To use the program, simply change the values in the 'User Inputs' section.
-You should not have to change anything outside of that section. The 
-default settings are for 49 Cet (HD 9672), and reproduces Fig. 7 of
-Pearce et al. 2022.
+To use the program, first download and unpack the ZIP file (press the 
+green 'Code' button on GitHub, then 'Download ZIP', then unzip the file on
+your computer). Then simply run SculptingPlanet.py in a terminal.
+
+The default settings are for 49 Cet (HD 9672), and reproduces Fig. 7 of
+Pearce et al. 2022. To change the parameters, change the values in the
+'User Inputs' section of SculptingPlanet.py (you should not have to change
+anything outside of that section).
 
 Feel free to use this code, and if the results go into a publication,
 then please cite Pearce et al. 2022. Also, let me know if you find any 
