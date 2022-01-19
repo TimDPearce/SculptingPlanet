@@ -22,6 +22,7 @@ then please cite Pearce et al. 2022. Also, let me know if you find any
 bugs or have any requests. Happy constraining!'''
 
 ############################### Libraries ###############################
+import sys
 import numpy as np
 import math
 from scipy import integrate
@@ -525,7 +526,7 @@ def CheckUserInputsOK():
 		print('***ERROR*** Problem(s) with user inputs:')
 		for reasonUnputsAreBad in reasonsUnputsAreBad:
 			print('     -%s' % reasonUnputsAreBad)
-		print()
+		PrintEmptyLine()
 		
 	return areUserInputsOK
 	
@@ -538,8 +539,16 @@ def PrintUserInputs():
 	print('     System age: %s myr' % GetValueAndUncertaintyString(age_myr, age1SigUp_myr, age1SigDown_myr))
 	print('     Disc inner edge peri: %s au' % GetValueAndUncertaintyString(discInnerEdgePeri_au, discInnerEdgePeri1SigUp_au, discInnerEdgePeri1SigDown_au))
 	print('     Disc inner edge apo: %s au' % GetValueAndUncertaintyString(discInnerEdgeApo_au, discInnerEdgeApo1SigUp_au, discInnerEdgeApo1SigDown_au))
-	print()
+	PrintEmptyLine()
 
+#------------------------------------------------------------------------
+def PrintEmptyLine():
+	'''Print an empty line (done this way to enable compatibility across 
+	Python versions)'''
+	
+	if sys.version_info[0] < 3: print
+	else: print()
+	
 #------------------------------------------------------------------------
 def PrintProgramOutputs(minMassPlanetPars, uncertaintiesOnMinMassPlanetPars):
 	'''Print the calculation results'''
@@ -568,7 +577,7 @@ def PrintProgramOutputs(minMassPlanetPars, uncertaintiesOnMinMassPlanetPars):
 	else:
 		print('     Min. eccentricity of plt to truncate disc: %s' % GetValueAndUncertaintyString(pltEccentricity, pltEccentricity1SigUp, pltEccentricity1SigDown))
 	
-	print()
+	PrintEmptyLine()
 	
 #------------------------------------------------------------------------
 def GetValueAndUncertaintyString(value, err1SigUp, err1SigDown):
@@ -850,10 +859,10 @@ def MakePlot(minMassPlanetPars, uncertaintiesOnMinMassPlanetPars):
 	plt.show()
 	
 	print('Complete')
-	print()
+	PrintEmptyLine()
 	
 ################################ Program ################################
-print()
+PrintEmptyLine()
 
 # Print the user inputs
 PrintUserInputs()
