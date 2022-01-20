@@ -15,7 +15,7 @@ region of parameter space that the planet can reside in.
 
 To use the program, first download and unpack the ZIP file (press the 
 green 'Code' button on GitHub, then 'Download ZIP', then unzip the file on
-your computer). Then simply run SculptingPlanet.py in a terminal.
+your computer). Then simply run sculptingPlanet.py in a terminal.
 
 The default settings are for 49 Cet (HD 9672), and reproduces Fig. 7 of
 Pearce et al. 2022. To change the parameters, change the values in the
