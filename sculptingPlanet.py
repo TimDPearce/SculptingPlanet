@@ -3,14 +3,15 @@
 sculpting a debris disc, by Tim D. Pearce. The model is from
 Pearce et al. 2022, which builds on that of Pearce & Wyatt 2014. It 
 assumes that a planet resides interior to the disc inner edge, and that 
-planet has cleared debris out to the disc inner edge. If the disc is
+this planet has cleared debris out to the disc inner edge. If the disc is
 eccentric, then the model also assumes that the eccentricity is driven by 
 the eccentricity of the planet. Given the parameters of the star and the 
 disc inner edge (and optionally their associated uncertainties), the 
 program calculates the minimum possible mass, maximum possible semimajor 
 axis and, if the disc is eccentric, the minimum possible eccentricity of 
 the perturbing planet. It can also produce a plot showing the allowed 
-region of parameter space that the planet can reside in.
+region of parameter space that the planet can reside in, and save the
+results as csv files.
 
 To use the program, simply change the values in the 'User Inputs' section
 just below. You should not have to change anything outside of that 
@@ -29,13 +30,17 @@ from scipy import integrate
 import matplotlib
 import matplotlib.pyplot as plt
 ############################## User Inputs ##############################
-''' Parameters of the system, and their associated uncertainties and 
-units. For example, if the star mass is 1.2 MSun with 1sigma 
-uncertainties of +0.1 MSun and -0.2 MSun, then set mStar_mSun=2, 
-mStar1SigUp_mSun=0.1 and mStar1SigDown_mSun=0.2. If you do not want
-to consider an uncertainty, use numpy NaN, e.g. 
-mStar1SigUp_mSun = np.nan. You should not need to change any part of 
-the code other than that in this section.'''
+'''Parameters of the system, and their associated uncertainties and
+units. In addition, settings for producing plots and outputting csv
+files.
+
+As an example, if the star mass is 1.2 MSun with 1sigma uncertainties of
++0.1 MSun and -0.2 MSun, then set mStar_mSun=2, mStar1SigUp_mSun=0.1 and
+mStar1SigDown_mSun=0.2. If you do not want to consider an uncertainty,
+use numpy NaN, e.g. mStar1SigUp_mSun = np.nan.
+
+You should not need to change any part of the code other than that in
+this section.'''
 
 # Star mass, in Solar masses
 mStar_mSun = 1.98
@@ -51,16 +56,27 @@ age1SigDown_myr = 5.
 # axisymmetric, then these will equal each other)
 discInnerEdgePeri_au = 62.5
 discInnerEdgePeri1SigUp_au = 4.0
-discInnerEdgePeri1SigDown_au = 4.5
+discInnerEdgePeri1SigDown_au = 4.0
 
 discInnerEdgeApo_au = 62.5
 discInnerEdgeApo1SigUp_au = 4.0
-discInnerEdgeApo1SigDown_au = 4.5
+discInnerEdgeApo1SigDown_au = 4.0
 
-# Should a plot be produced
+# Should a plot be produced (True or False)
 shouldPlotBeMade = True
 
+# Should the results be saved as csv files. If True, then the sculpting 
+# planet's minimum-possible mass, maximum possible semimajor axis and
+# miniumum-possible ecccentricity, as well as the various lines shown on
+# the graph, will be saved as csv files. The paths of those csv files are
+# also specified here, along with the delimiter character
+shouldResultsBeSaved = False
+csvDelimiter = ','
+planetConstraintsOutputFilePath = 'planetConstraints.csv'
+graphLinesOutputFilePath = 'graphLines.csv'
+
 ################# Global variables (don't change these!) ################
+'''Don't change anything beyond this point!'''
 if discInnerEdgePeri_au != discInnerEdgeApo_au: isDiscAsymmetric = True
 else: isDiscAsymmetric = False
 
@@ -501,26 +517,39 @@ def CheckUserInputsOK():
 	areUserInputsOK = True
 	reasonsUnputsAreBad = []
 	
-	# All values must be positive and non-zero
+	# All system parameters must be positive and non-nan
 	for value in [mStar_mSun, age_myr, discInnerEdgePeri_au, discInnerEdgeApo_au]:
-		if math.isnan(value) or value <= 0:
+		if isinstance(value, (float, int)) == False or math.isnan(value) or value <= 0:
 			areUserInputsOK = False
-			reasonsUnputsAreBad.append('All parameters should be non-zero, positive, and not nan (although uncertainties can be zero or nan)')
+			reasonsUnputsAreBad.append('All system parameters must be numbers that are non-zero, positive, and not nan (although uncertainties can be zero or nan)')
 			break
 
-	# All uncertainties must be positive or zero
-	for uncertaintyValue in [mStar1SigUp_mSun, mStar1SigDown_mSun, age1SigUp_myr, age1SigDown_myr, discInnerEdgePeri1SigUp_au, discInnerEdgePeri1SigDown_au,
+	# All system uncertainties must be positive or nan
+	for value in [mStar1SigUp_mSun, mStar1SigDown_mSun, age1SigUp_myr, age1SigDown_myr, discInnerEdgePeri1SigUp_au, discInnerEdgePeri1SigDown_au,
 		discInnerEdgeApo1SigUp_au, discInnerEdgeApo1SigDown_au]:
-		if math.isnan(uncertaintyValue) == False and uncertaintyValue < 0:
-			reasonsUnputsAreBad.append('All uncertainties must each be either zero, positive or nan')
+		if isinstance(value, (float, int)) == False or value < 0:
+			reasonsUnputsAreBad.append('All system uncertainties must be numbers that are either zero, positive or nan')
 			areUserInputsOK = False			
 			break
 	
 	# Disc apo and peri must be defined correctly
-	if discInnerEdgeApo_au < discInnerEdgePeri_au:
-		reasonsUnputsAreBad.append('Disc apocentre and pericentre are defined the wrong way around')
-		areUserInputsOK = False		
+	if isinstance(discInnerEdgeApo_au, (float, int)) and isinstance(discInnerEdgePeri_au, (float, int)):		
+		if discInnerEdgeApo_au < discInnerEdgePeri_au:
+			reasonsUnputsAreBad.append('Disc apocentre and pericentre are defined the wrong way around')
+			areUserInputsOK = False		
 			
+	# Boolean values must be correctly defined
+	for value in [shouldPlotBeMade, shouldResultsBeSaved]:
+		if isinstance(value, bool) == False:
+			reasonsUnputsAreBad.append('Some settings must be boolean, but are not')
+			areUserInputsOK = False
+	
+	# String values must be collectly defined
+	for value in [csvDelimiter, planetConstraintsOutputFilePath, graphLinesOutputFilePath]:
+		if isinstance(value, str) == False:
+			reasonsUnputsAreBad.append('Some parameters must be strings, but are not')
+			areUserInputsOK = False	
+	
 	# Warn the user if the inputs are bad
 	if areUserInputsOK == False:
 		print('***ERROR*** Problem(s) with user inputs:')
@@ -686,25 +715,14 @@ def GetValueAndUncertaintyString(value, err1SigUp, err1SigDown):
 
 	return valueAndUncertaintyString
 
-############################# Plot functions ############################
-def MakePlot(minMassPlanetPars, uncertaintiesOnMinMassPlanetPars):
-	'''Plot the constraints on plt mass and semimajor axis, like Fig. 7
-	in Pearce et al. 2022 or Fig. 17 in	Pearce & Wyatt 2014.'''
+######################## Plot and save functions ########################
+def MakePlotAndOrOutfiles(minMassPlanetPars, uncertaintiesOnMinMassPlanetPars):
+	'''Generate the constraints on planet mass and semimajor axis, like
+	Fig. 7 in Pearce et al. 2022 or Fig. 17 in Pearce & Wyatt 2014,
+	and/or produce csv files of the output data'''
 
-	print('Making plot...')
+	print('Generating data for plot and/or csv files...')
 
-	# Unpack the parameters of the minimum-mass plt and its 
-	# uncertainties
-	mPltMinForTrunc_mJup = minMassPlanetPars['mPlt_mJup']
-	pltSemimajorAxisMaxForTrunc_au = minMassPlanetPars['pltSemimajorAxis_au']
-	pltEccentricityMinForTrunc = minMassPlanetPars['pltEccentricity']
-	mPltMinForTrunc1SigUp_mJup = uncertaintiesOnMinMassPlanetPars['mPlt_mJup']['1SigUp']
-	mPltMinForTrunc1SigDown_mJup = uncertaintiesOnMinMassPlanetPars['mPlt_mJup']['1SigDown']
-	pltSemimajorAxisMaxForTrunc1SigUp_au = uncertaintiesOnMinMassPlanetPars['pltSemimajorAxis_au']['1SigUp']
-	pltSemimajorAxisMaxForTrunc1SigDown_au = uncertaintiesOnMinMassPlanetPars['pltSemimajorAxis_au']['1SigDown']
-	pltEccentricityMinForTrunc1SigUp = uncertaintiesOnMinMassPlanetPars['pltEccentricity']['1SigUp']
-	pltEccentricityMinForTrunc1SigDown = uncertaintiesOnMinMassPlanetPars['pltEccentricity']['1SigDown']	
-	
 	# Get the maximum possible semimajor axis of the planet. This will be
 	# where the planet apocentre exceeds the disc inner edge apocentre. 
 	# From rearranging Equation 5 in Pearce et al. (2022)
@@ -721,14 +739,47 @@ def MakePlot(minMassPlanetPars, uncertaintiesOnMinMassPlanetPars):
 	minPossiblePltSemimajorAxis1SigDown_au = 2./5.*(discInnerEdgeApo1SigDown_au**2 + discInnerEdgePeri1SigUp_au**2)**0.5
 	minPossiblePltSemimajorAxis_au = max(minPossiblePltSemimajorAxis_au, 1e-99)
 
+	maxAndMinPossibleSemimjorAxes = {
+		'maxPossiblePltSemimajorAxis_au': maxPossiblePltSemimajorAxis_au,
+		'maxPossiblePltSemimajorAxis1SigUp_au': maxPossiblePltSemimajorAxis1SigUp_au,
+		'maxPossiblePltSemimajorAxis1SigDown_au': maxPossiblePltSemimajorAxis1SigDown_au,
+
+		'minPossiblePltSemimajorAxis_au': minPossiblePltSemimajorAxis_au,
+		'minPossiblePltSemimajorAxis1SigUp_au': minPossiblePltSemimajorAxis1SigUp_au,
+		'minPossiblePltSemimajorAxis1SigDown_au': minPossiblePltSemimajorAxis1SigDown_au
+		}
+
 	# For each possible plt semimajor axis, run the 
 	# Pearce et al. (2022) analysis (including uncertainties)
 	numberOfSemimajorAxisSteps = 1000
 	auStep = (maxPossiblePltSemimajorAxis_au - minPossiblePltSemimajorAxis_au)/ float(numberOfSemimajorAxisSteps)
 	as_au = np.arange(minPossiblePltSemimajorAxis_au, maxPossiblePltSemimajorAxis_au*.999 + auStep, auStep)
 
-	mPltsFromHill_MJup, mPltsFromDiffusionTime_MJup, mPltsFromSecularTime_MJup, mPltsFromStirring_MJup = [], [], [], []
-	mPltsFromHill1SigUpVal_MJup, mPltsFromHill1SigDownVal_MJup, mPltsFromDiffusionTime1SigUpVal_MJup, mPltsFromDiffusionTime1SigDownVal_MJup, mPltsFromSecularTime1SigUpVal_MJup, mPltsFromSecularTime1SigDownVal_MJup, mPltsFromStirring1SigUpVal_MJup, mPltsFromStirring1SigDownVal_MJup = [], [], [], [], [], [], [], []
+	graphLineData = {
+		'as_au': as_au,
+		'mPltsFromHill_MJup': [],
+		'mPltsFromDiffusionTime_MJup': [],
+		'mPltsFromSecularTime_MJup': [],
+		'mPltsFromStirring_MJup': [],
+		
+		'mPltsFromHill1SigUp_MJup': [],
+		'mPltsFromHill1SigDown_MJup': [],
+		'mPltsFromDiffusionTime1SigUp_MJup': [],
+		'mPltsFromDiffusionTime1SigDown_MJup': [],
+		'mPltsFromSecularTime1SigUp_MJup': [],
+		'mPltsFromSecularTime1SigDown_MJup': [],
+		'mPltsFromStirring1SigUp_MJup': [],
+		'mPltsFromStirring1SigDown_MJup': [],
+		
+		'mPltsFromHill1SigUpVal_MJup': [],
+		'mPltsFromHill1SigDownVal_MJup': [],
+		'mPltsFromDiffusionTime1SigUpVal_MJup': [],
+		'mPltsFromDiffusionTime1SigDownVal_MJup': [],
+		'mPltsFromSecularTime1SigUpVal_MJup': [],
+		'mPltsFromSecularTime1SigDownVal_MJup': [],
+		'mPltsFromStirring1SigUpVal_MJup': [],
+		'mPltsFromStirring1SigDownVal_MJup': []
+		}
 
 	for a_au in as_au:
 	
@@ -749,6 +800,8 @@ def MakePlot(minMassPlanetPars, uncertaintiesOnMinMassPlanetPars):
 		# Diffusion time
 		mPltFromDiffusionTime_MJup = GetPltMassFromDiffusionTimeConstraint_mJup(a_au, mStar_mSun, age_myr, discInnerEdgeApo_au)
 		mPltFromDiffusion1SigUpFrac, mPltFromDiffusion1SigDownFrac = GetFracErrorOnPltMassAtSemimajorAxisFromDiffusionTimeConstraint(mStar_mSun, mStar1SigUp_mSun, mStar1SigDown_mSun, age_myr, age1SigUp_myr, age1SigDown_myr, discInnerEdgeApo_au, discInnerEdgeApo1SigUp_au, discInnerEdgeApo1SigDown_au)
+		mPltFromDiffusionTime1SigUp_MJup = mPltFromDiffusionTime_MJup * mPltFromDiffusion1SigUpFrac
+		mPltFromDiffusionTime1SigDown_MJup = mPltFromDiffusionTime_MJup * mPltFromDiffusion1SigDownFrac
 		mPltFromDiffusionTime1SigUpVal_MJup = mPltFromDiffusionTime_MJup * (1 + mPltFromDiffusion1SigUpFrac)
 		mPltFromDiffusionTime1SigDownVal_MJup = mPltFromDiffusionTime_MJup * (1 - mPltFromDiffusion1SigDownFrac)
 		
@@ -761,48 +814,70 @@ def MakePlot(minMassPlanetPars, uncertaintiesOnMinMassPlanetPars):
 		ASSUME SAME PLANET BOTH SCULPTS AND STIRS DISC'''
 
 		# Add values to lists
-		mPltsFromHill_MJup.append(mPltFromHill_MJup)
-		mPltsFromHill1SigUpVal_MJup.append(mPltFromHill1SigUpVal_MJup)
-		mPltsFromHill1SigDownVal_MJup.append(mPltFromHill1SigDownVal_MJup)		
+		graphLineData['mPltsFromHill_MJup'].append(mPltFromHill_MJup)
+		graphLineData['mPltsFromHill1SigUp_MJup'].append(mPltFromHill1SigUp_MJup)
+		graphLineData['mPltsFromHill1SigDown_MJup'].append(mPltFromHill1SigDown_MJup)
+		graphLineData['mPltsFromHill1SigUpVal_MJup'].append(mPltFromHill1SigUpVal_MJup)
+		graphLineData['mPltsFromHill1SigDownVal_MJup'].append(mPltFromHill1SigDownVal_MJup)		
 		
-		mPltsFromDiffusionTime_MJup.append(mPltFromDiffusionTime_MJup)
-		mPltsFromDiffusionTime1SigUpVal_MJup.append(mPltFromDiffusionTime1SigUpVal_MJup)
-		mPltsFromDiffusionTime1SigDownVal_MJup.append(mPltFromDiffusionTime1SigDownVal_MJup)
+		graphLineData['mPltsFromDiffusionTime_MJup'].append(mPltFromDiffusionTime_MJup)
+		graphLineData['mPltsFromDiffusionTime1SigUp_MJup'].append(mPltFromDiffusionTime1SigUp_MJup)
+		graphLineData['mPltsFromDiffusionTime1SigDown_MJup'].append(mPltFromDiffusionTime1SigDown_MJup)
+		graphLineData['mPltsFromDiffusionTime1SigUpVal_MJup'].append(mPltFromDiffusionTime1SigUpVal_MJup)
+		graphLineData['mPltsFromDiffusionTime1SigDownVal_MJup'].append(mPltFromDiffusionTime1SigDownVal_MJup)
 		
-		mPltsFromSecularTime_MJup.append(mPltFromSecularTimeConstraint_MJup)
-		mPltsFromSecularTime1SigUpVal_MJup.append(mPltFromSecularTimeConstraint1SigUpVal_MJup)
-		mPltsFromSecularTime1SigDownVal_MJup.append(mPltFromSecularTimeConstraint1SigDownVal_MJup)
+		graphLineData['mPltsFromSecularTime_MJup'].append(mPltFromSecularTimeConstraint_MJup)	
+		graphLineData['mPltsFromSecularTime1SigUp_MJup'].append(mPltFromSecularTime1SigUp_MJup)
+		graphLineData['mPltsFromSecularTime1SigDown_MJup'].append(mPltFromSecularTime1SigDown_MJup)
+		graphLineData['mPltsFromSecularTime1SigUpVal_MJup'].append(mPltFromSecularTimeConstraint1SigUpVal_MJup)
+		graphLineData['mPltsFromSecularTime1SigDownVal_MJup'].append(mPltFromSecularTimeConstraint1SigDownVal_MJup)
 
-	# Now produce the plot
-
-	# Vertical line for disc inner edge (apocentre)
-	if isDiscAsymmetric:
-		discApoLabel = 'Disc inner edge apo.'
-		discApoLw = 0.5
-	else:
-		discApoLabel = 'Disc inner edge'
-		discApoLw = 1
+	# Save the data as csv files, if desired
+	if shouldResultsBeSaved:
+		
+		# Save the constraints on the minimum-mass planet
+		SaveMinimumMassPlanetConstraints(minMassPlanetPars, uncertaintiesOnMinMassPlanetPars)
 	
-	plt.axvline(discInnerEdgeApo_au, color='k', lw=discApoLw, ls='-.', label=discApoLabel, zorder=100)
-	plt.axvspan(discInnerEdgeApo_au, 1e99, color='#bf7171', zorder=0)
-	plt.axvspan(discInnerEdgeApo_au - discInnerEdgeApo1SigDown_au, discInnerEdgeApo_au + discInnerEdgeApo1SigUp_au, color = 'grey', alpha=0.4, zorder=50)
+		# Save the graph lines
+		SaveGraphLines(graphLineData)
+		
+	# Now produce the plot, if desired
+	if shouldPlotBeMade:
+		MakePlot(graphLineData, minMassPlanetPars, maxAndMinPossibleSemimjorAxes)
 
+#------------------------------------------------------------------------
+def MakePlot(graphLineData, minMassPlanetPars, maxAndMinPossibleSemimjorAxes):
+	'''Make a plot like Fig. 7 in Pearce et al. (2022), showing the
+	constraints on planet mass vs. semimajor axis'''
+
+	# Unpack the parameters of the minimum-mass plt and its 
+	# uncertainties
+	mPltMinForTrunc_mJup = minMassPlanetPars['mPlt_mJup']
+	pltSemimajorAxisMaxForTrunc_au = minMassPlanetPars['pltSemimajorAxis_au']
+	pltEccentricityMinForTrunc = minMassPlanetPars['pltEccentricity']
+	mPltMinForTrunc1SigUp_mJup = uncertaintiesOnMinMassPlanetPars['mPlt_mJup']['1SigUp']
+	mPltMinForTrunc1SigDown_mJup = uncertaintiesOnMinMassPlanetPars['mPlt_mJup']['1SigDown']
+	pltSemimajorAxisMaxForTrunc1SigUp_au = uncertaintiesOnMinMassPlanetPars['pltSemimajorAxis_au']['1SigUp']
+	pltSemimajorAxisMaxForTrunc1SigDown_au = uncertaintiesOnMinMassPlanetPars['pltSemimajorAxis_au']['1SigDown']
+	pltEccentricityMinForTrunc1SigUp = uncertaintiesOnMinMassPlanetPars['pltEccentricity']['1SigUp']
+	pltEccentricityMinForTrunc1SigDown = uncertaintiesOnMinMassPlanetPars['pltEccentricity']['1SigDown']	
+	
 	# Planet masses from Hill constraint
-	plt.plot(as_au, mPltsFromHill_MJup, 'k', label='Hill', zorder=100)
-	plt.fill_between(as_au, mPltsFromHill1SigDownVal_MJup, mPltsFromHill1SigUpVal_MJup, lw=0, color = 'grey', alpha=0.4, zorder=30)
-	plt.fill_between(as_au, mPltsFromHill1SigUpVal_MJup, 1e99, lw=0, color='#b3b3b3', zorder=50)
-	plt.fill_between(as_au, mPltsFromHill1SigDownVal_MJup, lw=0, color='#b3b3b3', zorder=50)
+	plt.plot(graphLineData['as_au'], graphLineData['mPltsFromHill_MJup'], 'k', label='Hill', zorder=100)
+	plt.fill_between(graphLineData['as_au'], graphLineData['mPltsFromHill1SigDownVal_MJup'], graphLineData['mPltsFromHill1SigUpVal_MJup'], lw=0, color = 'grey', alpha=0.4, zorder=30)
+	plt.fill_between(graphLineData['as_au'], graphLineData['mPltsFromHill1SigUpVal_MJup'], 1e99, lw=0, color='#b3b3b3', zorder=50)
+	plt.fill_between(graphLineData['as_au'], graphLineData['mPltsFromHill1SigDownVal_MJup'], lw=0, color='#b3b3b3', zorder=50)
 
 	# Planet masses from diffusion time constraint
-	plt.plot(as_au, mPltsFromDiffusionTime_MJup, 'r:', label='Diffusion', zorder=100)
-	plt.fill_between(as_au, mPltsFromDiffusionTime1SigDownVal_MJup, mPltsFromDiffusionTime1SigUpVal_MJup, lw=0, color = 'grey', alpha=0.4, zorder=50)
-	plt.fill_between(as_au, mPltsFromDiffusionTime1SigUpVal_MJup, 1e99, lw=0, color='w', zorder=40)
-	plt.fill_between(as_au, mPltsFromDiffusionTime1SigDownVal_MJup, lw=0, color='#b3b3b3', zorder=20)
+	plt.plot(graphLineData['as_au'], graphLineData['mPltsFromDiffusionTime_MJup'], 'r:', label='Diffusion', zorder=100)
+	plt.fill_between(graphLineData['as_au'], graphLineData['mPltsFromDiffusionTime1SigDownVal_MJup'], graphLineData['mPltsFromDiffusionTime1SigUpVal_MJup'], lw=0, color = 'grey', alpha=0.4, zorder=50)
+	plt.fill_between(graphLineData['as_au'], graphLineData['mPltsFromDiffusionTime1SigUpVal_MJup'], 1e99, lw=0, color='w', zorder=40)
+	plt.fill_between(graphLineData['as_au'], graphLineData['mPltsFromDiffusionTime1SigDownVal_MJup'], lw=0, color='#b3b3b3', zorder=20)
 	
 	# Planet masses from secular time constraint
-	plt.plot(as_au, mPltsFromSecularTime_MJup, 'b:', label='Secular', zorder=100)	
-	plt.fill_between(as_au, mPltsFromSecularTime1SigDownVal_MJup, mPltsFromSecularTime1SigUpVal_MJup, lw=0, color = 'grey', alpha=0.4, zorder=50)
-	plt.fill_between(as_au, mPltsFromSecularTime1SigDownVal_MJup, lw=0, color='#b3b3b3', zorder=20)	
+	plt.plot(graphLineData['as_au'], graphLineData['mPltsFromSecularTime_MJup'], 'b:', label='Secular', zorder=100)	
+	plt.fill_between(graphLineData['as_au'], graphLineData['mPltsFromSecularTime1SigDownVal_MJup'], graphLineData['mPltsFromSecularTime1SigUpVal_MJup'], lw=0, color = 'grey', alpha=0.4, zorder=50)
+	plt.fill_between(graphLineData['as_au'], graphLineData['mPltsFromSecularTime1SigDownVal_MJup'], lw=0, color='#b3b3b3', zorder=20)	
 
 	# Minimum-mass planet
 	pltSemimajorAxisMaxForTruncErrors_au = np.zeros((2, 1))
@@ -814,18 +889,31 @@ def MakePlot(minMassPlanetPars, uncertaintiesOnMinMassPlanetPars):
 	mPltMinForTruncErrors_MJup[1] = mPltMinForTrunc1SigUp_mJup
 	plt.errorbar(pltSemimajorAxisMaxForTrunc_au, mPltMinForTrunc_mJup, xerr = pltSemimajorAxisMaxForTruncErrors_au, yerr = mPltMinForTruncErrors_MJup, linestyle = '', marker = 'o', color='r', ecolor='k', elinewidth = 0.5, capsize = 3, zorder = 200, label='Min. mass planet')	
 
+	# Vertical line for disc inner edge (apocentre)
+	if isDiscAsymmetric:
+		discApoLabel = 'Disc inner edge apo.'
+		discApoLw = 0.5
+	else:
+		discApoLabel = 'Disc inner edge'
+		discApoLw = 1
+	
+	plt.axvline(discInnerEdgeApo_au, color='k', lw=discApoLw, ls='-.', label=discApoLabel, zorder=100)
+	plt.axvspan(discInnerEdgeApo_au, 1e10, color='#bf7171', zorder=0)
+	plt.axvspan(discInnerEdgeApo_au - discInnerEdgeApo1SigDown_au, discInnerEdgeApo_au + discInnerEdgeApo1SigUp_au, color = 'grey', alpha=0.4, zorder=50)
+
 	# Vertical line for max and min planet semimajor axis (before planet 
 	# apocentre would lie outside disc inner edge apocentre). Only plot 
 	# if disc asymmetric, since otherwise the planet eccentricity is zero
 	# and this bound is just the disc inner edge
 	if isDiscAsymmetric:
-		plt.axvline(maxPossiblePltSemimajorAxis_au, color='k', ls= '--', label=r'$Q_{plt} < Q_{i}$', zorder=100)
-		plt.axvspan(maxPossiblePltSemimajorAxis_au, 1e99, color='#bf7171', zorder=0)
-		plt.axvspan(maxPossiblePltSemimajorAxis_au - maxPossiblePltSemimajorAxis1SigDown_au, maxPossiblePltSemimajorAxis_au + maxPossiblePltSemimajorAxis1SigUp_au, color = 'grey', alpha=0.4, zorder=50)
+	
+		plt.axvline(maxAndMinPossibleSemimjorAxes['maxPossiblePltSemimajorAxis_au'], color='k', ls= '--', label=r'$Q_{plt} < Q_{i}$', zorder=100)
+		plt.axvspan(maxAndMinPossibleSemimjorAxes['maxPossiblePltSemimajorAxis_au'], 1e10, color='#bf7171', zorder=0)
+		plt.axvspan(maxAndMinPossibleSemimjorAxes['maxPossiblePltSemimajorAxis_au'] - maxAndMinPossibleSemimjorAxes['maxPossiblePltSemimajorAxis1SigDown_au'], maxAndMinPossibleSemimjorAxes['maxPossiblePltSemimajorAxis_au'] + maxAndMinPossibleSemimjorAxes['maxPossiblePltSemimajorAxis1SigUp_au'], color = 'grey', alpha=0.4, zorder=50)
 
-		plt.axvline(minPossiblePltSemimajorAxis_au, color='k', ls= (0, (3, 4, 1, 4, 1, 4)), label=r'$e_{plt} < 1$', zorder=100)
-		plt.axvspan(0, minPossiblePltSemimajorAxis_au, color='#b3b3b3', zorder=0)
-		plt.axvspan(minPossiblePltSemimajorAxis_au - minPossiblePltSemimajorAxis1SigDown_au, minPossiblePltSemimajorAxis_au + minPossiblePltSemimajorAxis1SigUp_au, color = 'grey', alpha=0.4, zorder=50)
+		plt.axvline(maxAndMinPossibleSemimjorAxes['minPossiblePltSemimajorAxis_au'], color='k', ls= (0, (3, 4, 1, 4, 1, 4)), label=r'$e_{plt} < 1$', zorder=100)
+		plt.axvspan(-1e10, maxAndMinPossibleSemimjorAxes['minPossiblePltSemimajorAxis_au'], color='#b3b3b3', zorder=0)
+		plt.axvspan(maxAndMinPossibleSemimjorAxes['minPossiblePltSemimajorAxis_au'] - maxAndMinPossibleSemimjorAxes['minPossiblePltSemimajorAxis1SigDown_au'], maxAndMinPossibleSemimjorAxes['minPossiblePltSemimajorAxis_au'] + maxAndMinPossibleSemimjorAxes['minPossiblePltSemimajorAxis1SigUp_au'], color = 'grey', alpha=0.4, zorder=50)
 
 	# Legend
 	plt.legend().set_zorder(1000)
@@ -857,21 +945,173 @@ def MakePlot(minMassPlanetPars, uncertaintiesOnMinMassPlanetPars):
 			
 	# Show the plot	
 	plt.show()
+
+#------------------------------------------------------------------------
+def SaveMinimumMassPlanetConstraints(minMassPlanetPars, uncertaintiesOnMinMassPlanetPars):
+	'''Save the minimum mass, maximum semimajor axis and minimum 
+	eccentricty of the sculpting planet as a csv file'''
 	
-	print('Complete')
-	PrintEmptyLine()
+	# Number of lines to remove from the end of each CSV line
+	numCharsToRemoveFromLineEnd = GetNumberOfCharsToRemoveFromEndOfCsvLines()
 	
+	# The names of the data to write out, in desired order
+	dataNamesToWrite = ['mPlt_mJup', 'pltSemimajorAxis_au', 'pltEccentricity']
+	
+	# Write the file
+	with open(planetConstraintsOutputFilePath, 'w') as outfile:
+	
+		# Header line
+		headerString = ''
+		
+		for dataName in dataNamesToWrite:
+			
+			# Expand the data name and add to header
+			if dataName == 'mPlt_mJup': dataNameToWrite = 'minMass_mJup'
+			elif dataName == 'pltSemimajorAxis_au': dataNameToWrite = 'maxSemimajorAxis_au'
+			elif dataName == 'pltEccentricity': dataNameToWrite = 'minEccentricity'
+			
+			headerString += '%s%s ' % (dataNameToWrite, csvDelimiter)
+			
+			# Get where the underscore in the value name is (for 
+			# writing uncertainties next)
+			underscoreIndex = GetIndexOfCharInString(dataNameToWrite, '_')
+				
+			# The uncertainty names
+			for uncertaintyType in ['1SigUp', '1SigDown']:
+				
+				uncertaintyNameToWrite = '%s%s%s' % (dataNameToWrite[:underscoreIndex], uncertaintyType, dataNameToWrite[underscoreIndex:])
+				
+				headerString += '%s%s ' % (uncertaintyNameToWrite, csvDelimiter)
+			
+		# Write the header
+		outfile.write(headerString[:-numCharsToRemoveFromLineEnd])
+
+		# Data line
+		dataString = '\n'
+		
+		for dataName in dataNamesToWrite:
+			
+			# The data value
+			dataValue = minMassPlanetPars[dataName]
+			
+			# If this is the eccentricity, and the disc is
+			# axisymmetric, then min. eccentricity is nan. Change to 0	
+			if dataName == 'pltEccentricity' and discInnerEdgeApo_au == discInnerEdgePeri_au:
+				dataValueToWrite = 0
+			else: dataValueToWrite = dataValue
+			
+			# Update the data string			
+			dataString += '%s%s ' % (dataValueToWrite, csvDelimiter)
+			
+			# The uncertainty values
+			for uncertaintyType in ['1SigUp', '1SigDown']:
+				dataString += '%s%s ' % (uncertaintiesOnMinMassPlanetPars[dataName][uncertaintyType], csvDelimiter)
+			
+		# Write the data line
+		outfile.write(dataString[:-numCharsToRemoveFromLineEnd])
+
+	print('     Planet constraints saved as %s' % planetConstraintsOutputFilePath)	
+
+#------------------------------------------------------------------------
+def SaveGraphLines(graphLineData):
+	'''Save the graph lines'''
+
+	# Number of lines to remove from the end of each CSV line
+	numCharsToRemoveFromLineEnd = GetNumberOfCharsToRemoveFromEndOfCsvLines()
+	
+	# The names of the data to write out, in desired order
+	dataNamesToWrite = ['as_au', 'mPltsFromHill_MJup', 'mPltsFromDiffusionTime_MJup', 'mPltsFromSecularTime_MJup']	
+	
+	# Write the file
+	with open(graphLinesOutputFilePath, 'w') as outfile:
+	
+		# Header line
+		headerString = ''
+		
+		for dataName in dataNamesToWrite:
+			
+			# Expand the data name and add to header
+			if dataName == 'as_au': dataNameToWrite = 'semimajorAxis_au'
+			elif dataName == 'mPltsFromHill_MJup': dataNameToWrite = 'planetMassFromHill_MJup'
+			elif dataName == 'mPltsFromDiffusionTime_MJup': dataNameToWrite = 'minPlanetMassFromDiffusionTime_MJup'
+			elif dataName == 'mPltsFromSecularTime_MJup': dataNameToWrite = 'minPlanetMassFromSecularTime_MJup'
+		
+			headerString += '%s%s ' % (dataNameToWrite, csvDelimiter)
+			
+			# Get where the underscore in the value name is (for 
+			# writing uncertainties next)
+			underscoreIndex = GetIndexOfCharInString(dataNameToWrite, '_')
+				
+			# The uncertainty names
+			if dataName != 'as_au':
+				for uncertaintyType in ['1SigUp', '1SigDown']:
+					
+					uncertaintyNameToWrite = '%s%s%s' % (dataNameToWrite[:underscoreIndex], uncertaintyType, dataNameToWrite[underscoreIndex:])
+					
+					headerString += '%s%s ' % (uncertaintyNameToWrite, csvDelimiter)
+				
+		# Write the header
+		outfile.write(headerString[:-numCharsToRemoveFromLineEnd])
+
+		# Data lines
+		for dataLineIndex in range(len(graphLineData['as_au'])):
+			
+			dataString = '\n'
+			
+			for dataName in dataNamesToWrite:
+				
+				# The data value
+				dataValue = graphLineData[dataName][dataLineIndex]
+				
+				# Update the data string			
+				dataString += '%s%s ' % (dataValue, csvDelimiter)
+				
+				# The uncertainty values
+				if dataName != 'as_au':
+					for uncertaintyType in ['1SigUp', '1SigDown']:
+						
+						underscoreIndex = GetIndexOfCharInString(dataName, '_')
+						
+						dataUncertaintyName = '%s%s%s' % (dataName[:underscoreIndex], uncertaintyType, dataName[underscoreIndex:])
+						
+						dataString += '%s%s ' % (graphLineData[dataUncertaintyName][dataLineIndex], csvDelimiter)
+				
+			# Write the data line
+			outfile.write(dataString[:-numCharsToRemoveFromLineEnd])
+		
+	print('     Graph lines saved as %s' % graphLinesOutputFilePath)
+	
+#------------------------------------------------------------------------
+def GetNumberOfCharsToRemoveFromEndOfCsvLines():
+	'''Get the number of characters to remove from the end of each CSV
+	line, to remove excess spaces and delimiters'''
+
+	# Length of csv delimiter plus space
+	numCharsToRemoveFromLineEnd = len(csvDelimiter) + 1
+
+	return numCharsToRemoveFromLineEnd
+
+#------------------------------------------------------------------------
+def GetIndexOfCharInString(inputString, char):
+	'''Get the index of the last instance of a character in a string. If
+	the character is not in the string, return the string length'''
+
+	charIndex = inputString.rfind(char)
+	if charIndex == -1: charIndex = len(inputString)
+
+	return charIndex
+
 ################################ Program ################################
 PrintEmptyLine()
-
-# Print the user inputs
-PrintUserInputs()
 	
 # Check user inputs fine
 areUserInputsOK = CheckUserInputsOK()
 
 # Continue if the user inputs are OK
 if areUserInputsOK:
+
+	# Print the user inputs
+	PrintUserInputs()
 
 	# Get the parameters of the minimum-mass plt that can truncate the
 	# disc
@@ -883,9 +1123,13 @@ if areUserInputsOK:
 	# Print the results
 	PrintProgramOutputs(minMassPlanetPars, uncertaintiesOnMinMassPlanetPars)
 
-	# Make the figure if desired
-	if shouldPlotBeMade:
-		MakePlot(minMassPlanetPars, uncertaintiesOnMinMassPlanetPars)
+	# Make the figure and/or csv files if desired
+	if shouldPlotBeMade or shouldResultsBeSaved:
+		MakePlotAndOrOutfiles(minMassPlanetPars, uncertaintiesOnMinMassPlanetPars)
 
+	PrintEmptyLine()
+	print('Complete')
+	PrintEmptyLine()
+	
 #########################################################################
 
