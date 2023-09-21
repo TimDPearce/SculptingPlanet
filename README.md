@@ -11,7 +11,8 @@ disc inner edge (and optionally their associated uncertainties), the
 program calculates the minimum possible mass, maximum possible semimajor 
 axis and, if the disc is eccentric, the minimum possible eccentricity of 
 the perturbing planet. It can also produce a plot showing the allowed 
-region of parameter space that the planet can reside in.
+region of parameter space that the planet can reside in, and save the
+results as csv files.
 
 To use the program, first download and unpack the ZIP file (press the 
 green 'Code' button on GitHub, then 'Download ZIP', then unzip the file on
